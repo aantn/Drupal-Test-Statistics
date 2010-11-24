@@ -13,42 +13,55 @@
 import os
 import argparse
 
-# Define constants
-CODE_EXTS = ["php", "inc", "module", "install"]	# which file extensions are included in the linecount
+# Define constants and global variables
+CODE_EXTS = ["php", "inc", "module", "install"]	# file extensions to be included in the linecount
+OUTPUT_SEP = "-" * 100				# string used to separate between different sections of output
+best_ratio = 0					# the best ratio out of all the modules 
+best_module = ""				# name of module with the best ratio
+sum_ratios = 0					# sum of all ratios
+num_ratios = 0					# num of non-zero ratios
+testless_modules = []				# list of modules with no tests at all
 
 # Setup command line arguments
 parser = argparse.ArgumentParser(description="Test statistics for Drupal Core Modules. This script checks out all of the drupal"
 				+ "core modules and calculates each module's ratio of [lines of code] / [unit tests]")
 #parser.add_argument("-c", "--checkout-dir", dest="checkout", default="modules", help="the directory where we'll checkout drupal modules")
+parser.add_argument("-c", "--custom-module", dest="custom_module", default=None, help="the directory of a custom module to include in the stats count")
 args = parser.parse_args()
 
 # Functions
-def print_header ():
-	"""Prints the titles of each output column"""
-	# these are titles of each output column
-	cols = ["Module", "Code lines", "Test lines", "Asserts", "Ratio * 100"]
-	
-	# take each title and pad it with whitespace (so that each column has a standard width)	
-	outp = ""
-	for col in cols:
-		outp += col.ljust(10) + "\t"
-
-	# print out the header
-	print "-" * 80	
-	print outp
-	print "-" * 80
-
 def download_core_modules ():
 	"""Downloads all core drupal modules from CVS and returns a list of paths to each module"""
 	# Download all core modules to ./drupal/modules/
 	os.system("cvs -z6 -d:pserver:anonymous:anonymous@cvs.drupal.org:/cvs/drupal checkout -P drupal/modules")
+	
 	# Return the paths of each module
 	FILTER = ["README.txt", "CVS"]
 	return [os.path.abspath("drupal/modules/" + module)
 		for module in os.listdir("drupal/modules")
 		if module not in FILTER]
 
-def calc_module_stats (module):
+def print_header (name):
+	"""
+	Prints the titles of each output column
+	
+	name: the name of this group of modules	
+	"""
+	# these are titles of each output column
+	cols = ["Module", "Code lines", "Test lines", "Asserts", "Ratio * 100"]
+	
+	# take each title and pad it with whitespace (so that each column has a standard width)	
+	outp = "\t"
+	for col in cols:
+		outp += col.ljust(10) + "\t"
+
+	# print out the header
+	print OUTPUT_SEP
+	print outp
+	print OUTPUT_SEP
+	print name
+
+def print_module_stats (module):
 	"""
 	Calculates and prints stats for one module.
 	
@@ -75,18 +88,51 @@ def calc_module_stats (module):
 			for line in open(path):
 				test_lines += 1
 				test_asserts += line.count("assert")
+		
 		# if the file is php code
 		elif ext in CODE_EXTS:
 			for line in open(path): lines += 1
 	
+	# calculate the ratio
+	ratio = float(test_asserts) / lines
+
+	# calculate global stats
+	global sum_ratios, num_ratios, best_ratio, best_module
+	if ratio == 0:
+		testless_modules.append(name)
+	else:
+		sum_ratios += ratio
+		num_ratios += 1
+		
+		if ratio > best_ratio:
+			best_ratio = ratio
+			best_module = name
+
 	# print out stats for this module
-	print "%s\t%10d\t%10d\t%10d\t%4f" % (name.ljust(10), lines, test_lines, test_asserts,
-						float(test_asserts) / lines * 100)
+	print "\t%s\t%10d\t%10d\t%10d\t%4f" % (name.ljust(10), lines, test_lines, test_asserts,
+						ratio * 100)
 
 # Main program
 if __name__ == "__main__":
+	# Download all core modules and get their paths
 	modules = download_core_modules()
-	print_header()
+	
+	# Print the header row
+	print_header("Core Modules:")
+	
+	# Print stats for all core modules
 	for mod in modules:
-		calc_module_stats(mod)	
+		print_module_stats(mod)	
+	
+	# If the user wants, print stats for a custom module
+	if args.custom_module is not None:
+		print "Custom Modules:"
+		print_module_stats(os.path.abspath(args.custom_module))
+	
+	# Print out the best and average ratios
+	print OUTPUT_SEP
+	print "Overall Stats:"
+	print "\tAverage ratio: %f" % (sum_ratios / num_ratios)
+	print "\tBest ratio: %f (%s module)" % (best_ratio, best_module)
+	print "\tThe following %d modules have no tests at all: %s" % (len(testless_modules), ", ".join(testless_modules))
 
