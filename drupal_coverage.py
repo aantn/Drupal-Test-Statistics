@@ -13,6 +13,7 @@ import os
 import argparse
 
 # Define constants and global variables
+DOWNLOAD_DIR = "stats_checkout/"		# dir where we download core and contrib modules
 CODE_EXTS = ["php", "inc", "module", "install"]	# file extensions to be included in the linecount
 OUTPUT_SEP = "-" * 100				# string used to separate between different sections of output
 best_ratio = 0					# the best ratio out of all the modules 
@@ -21,32 +22,47 @@ sum_ratios = 0					# sum of all ratios
 num_ratios = 0					# num of non-zero ratios
 testless_modules = []				# list of modules with no tests at all
 
+# lastly, include a list of the top 49 most popular drupal modules (in order of popularity)
+TOP_MODULES = ['views', 'cck', 'token', 'pathauto', 'filefield', 'admin_menu', 'imageapi', 'imagefield', 'imagecache', 'date', 'imce', 'google_analytics', 'wysiwyg', 'webform', 'advanced_help', 'poormanscron', 'captcha', 'image', 'jquery_ui', 'ctools', 'lightbox2', 'nodewords', 'link', 'backup_migrate', 'jquery_update', 'devel', 'xmlsitemap', 'fckeditor', 'panels', 'globalredirect', 'calendar', 'page_title', 'zen', 'imce_wysiwyg', 'transliteration', 'votingapi', 'ckeditor', 'views_slideshow', 'print', 'nice_menus', 'tagadelic', 'email', 'logintoboggan', 'contemplate', 'rules', 'site_map', 'path_redirect', 'emfield', 'i18n']
+
+
 # Setup command line arguments
 parser = argparse.ArgumentParser(description="Test statistics for Drupal Core Modules. This script checks out all of the drupal"
 				+ "core modules and calculates each module's ratio of [lines of code] / [unit tests]")
-parser.add_argument("-c", "--custom-module", dest="custom_module", default=None, help="the directory of a custom module to include in the stats count")
+parser.add_argument("-l", "--local-module", dest="local_module", default=None, help="the directory of a custom local module to include in the stats count")
+parser.add_argument("-c", "--contrib-module", dest="contrib_module", default=None, help="the name of a custom contrib module to download and include in the stats count")
 args = parser.parse_args()
 
 # Functions
 def download_core_modules ():
 	"""Downloads all core drupal modules from CVS and returns a list of paths to each module"""
-	# Download all core modules to ./drupal/modules/
-	os.system("cvs -z6 -d:pserver:anonymous:anonymous@cvs.drupal.org:/cvs/drupal checkout -P drupal/modules")
+	# Download all core modules to ./DOWNLOAD_DIR/core/
+	dest = DOWNLOAD_DIR + "core/"
+	os.system("cvs -z6 -d:pserver:anonymous:anonymous@cvs.drupal.org:/cvs/drupal checkout -P -d %s drupal/modules" % (dest,))
 	
 	# Return the paths of each module
 	FILTER = ["README.txt", "CVS"]
-	return [os.path.abspath("drupal/modules/" + module)
-		for module in os.listdir("drupal/modules")
+	return [os.path.abspath(dest + module)
+		for module in os.listdir(dest)
 		if module not in FILTER]
 
-def print_header (name):
-	"""
-	Prints the titles of each output column
+def download_contrib_module (module):
+	"""Takes the name of a community module, downloads it, and returns the path"""
+	# Download the module to ./DOWNLOAD_DIR/contrib
+	dest = DOWNLOAD_DIR + "contrib/" + module + "/"
+	os.system("cvs -z6 -d:pserver:anonymous:anonymous@cvs.drupal.org:/cvs/drupal-contrib checkout -P -d %s contributions/modules/%s/" % (dest, module))
 	
-	name: the name of this group of modules	
-	"""
+	# Return the path of the downloaded module
+	return os.path.abspath(dest)
+
+def download_top_modules ():
+	"""Downloades the top 50 community modules and returns a list of paths to each module"""
+	return [download_contrib_module(mod) for mod in TOP_MODULES]		
+
+def print_header ():
+	"""Prints the titles of each output column"""
 	# these are titles of each output column
-	cols = ["Module", "Code lines", "Test lines", "Asserts", "Ratio * 100"]
+	cols = ["Module", "Code lines", "Test lines", "Asserts", "Ratio (%)"]
 	
 	# take each title and pad it with whitespace (so that each column has a standard width)	
 	outp = "\t"
@@ -57,7 +73,6 @@ def print_header (name):
 	print OUTPUT_SEP
 	print outp
 	print OUTPUT_SEP
-	print name
 
 def print_module_stats (module):
 	"""
@@ -92,7 +107,7 @@ def print_module_stats (module):
 			for line in open(path): lines += 1
 	
 	# calculate the ratio
-	ratio = float(test_asserts) / lines
+	ratio = float(test_asserts) / lines * 100
 
 	# calculate global stats
 	global sum_ratios, num_ratios, best_ratio, best_module
@@ -107,30 +122,46 @@ def print_module_stats (module):
 			best_module = name
 
 	# print out stats for this module
-	print "\t%s\t%10d\t%10d\t%10d\t%4f" % (name.ljust(10), lines, test_lines, test_asserts,
-						ratio * 100)
+	print "\t%s\t%10d\t%10d\t%10d\t%f%%" % (name.ljust(10), lines, test_lines, test_asserts,
+						ratio)
+
+def print_overall_stats ():
+	print OUTPUT_SEP
+	print "Overall Stats:"
+	print "\tAverage ratio: %f%%" % (sum_ratios / num_ratios)
+	print "\tBest ratio: %f%% (%s module)" % (best_ratio, best_module)
+	print "\tThe following %d modules have no tests at all: %s" % (len(testless_modules), ", ".join(testless_modules))
 
 # Main program
 if __name__ == "__main__":
-	# Download all core modules and get their paths
-	modules = download_core_modules()
-	
-	# Print the header row
-	print_header("Core Modules:")
-	
-	# Print stats for all core modules
-	for mod in modules:
-		print_module_stats(mod)	
-	
-	# If the user wants, print stats for a custom module
-	if args.custom_module is not None:
-		print "Custom Modules:"
-		print_module_stats(os.path.abspath(args.custom_module))
-	
-	# Print out the best and average ratios
-	print OUTPUT_SEP
-	print "Overall Stats:"
-	print "\tAverage ratio: %f" % (sum_ratios / num_ratios)
-	print "\tBest ratio: %f (%s module)" % (best_ratio, best_module)
-	print "\tThe following %d modules have no tests at all: %s" % (len(testless_modules), ", ".join(testless_modules))
+	# Download all core and top modules and get their paths
+	core_modules = download_core_modules()
+	top_modules = download_top_modules()
 
+	# Do the same for the custom module
+	if args.contrib_module is not None:
+		custom_contrib = download_contrib_module(args.contrib_module)
+
+	# Print the header row
+	print_header()
+	
+	# Print stats for all core and top modules
+	print "Core Modules:"
+	for mod in core_modules:
+		print_module_stats(mod)	
+	print "Top Modules (sorted by popularity):"
+	for mod in top_modules:
+		print_module_stats(mod)
+
+	# If the user wants, print stats for a custom modules
+	print "Custom Modules:"
+	if args.local_module is not None:
+		print_module_stats(os.path.abspath(args.local_module))
+	if args.contrib_module is not None:
+		print_module_stats(custom_contrib)
+	if not args.local_module and not args.contrib_module:
+		print "\t(None)"
+
+	# Print out the best and average ratios
+	print_overall_stats ()
+	
