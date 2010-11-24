@@ -5,9 +5,6 @@
 # 
 # This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
-#
-# TODO:
-#	* Count lines of code in subdirectories (right now we don't properly line-count the "field" module)
 
 import os
 import argparse
@@ -66,7 +63,8 @@ def print_header ():
 	
 	# take each title and pad it with whitespace (so that each column has a standard width)	
 	outp = "\t"
-	for col in cols:
+	outp += cols[0].ljust(17) + "\t"
+	for col in cols[1:]:
 		outp += col.ljust(10) + "\t"
 
 	# print out the header
@@ -89,25 +87,30 @@ def print_module_stats (module):
 	name = module.split("/")[-1]
 
 	# loop over all files in the module
-	for f in os.listdir(module):
-		# get the file's extension
-		ext = f.split(".")[-1]
+	for root, subdirs, files in os.walk(module):
+		for f in files:
+			# get the file's extension
+			ext = f.split(".")[-1]
 		
-		# get the file's full path
-		path = os.path.join(module, f)
-		
-		# if the file is a test case
-		if ext == "test":
-			for line in open(path):
-				test_lines += 1
-				test_asserts += line.count("assert")
-		
-		# if the file is php code
-		elif ext in CODE_EXTS:
-			for line in open(path): lines += 1
+			# get the file's full path
+			path = os.path.join(root, f)
+			
+			# if the file is a test case (or if it's regular code under the tests/ directory)
+			if ext == "test" or (ext in CODE_EXTS and root.count("tests") > 0):
+				for line in open(path):
+					test_lines += 1
+					test_asserts += line.count("assert")
+			
+			# if the file is php code
+			elif ext in CODE_EXTS:
+				for line in open(path): lines += 1
 	
 	# calculate the ratio
-	ratio = float(test_asserts) / lines * 100
+	if lines != 0:
+		ratio = float(test_asserts) / lines * 100
+	else:
+		ratio = 0
+		#print "WARNING: 0 lines were found for the %s module" % (name,)
 
 	# calculate global stats
 	global sum_ratios, num_ratios, best_ratio, best_module
@@ -122,7 +125,7 @@ def print_module_stats (module):
 			best_module = name
 
 	# print out stats for this module
-	print "\t%s\t%10d\t%10d\t%10d\t%f%%" % (name.ljust(10), lines, test_lines, test_asserts,
+	print "\t%s\t%10d\t%10d\t%10d\t%f%%" % (name.ljust(17), lines, test_lines, test_asserts,
 						ratio)
 
 def print_overall_stats ():
