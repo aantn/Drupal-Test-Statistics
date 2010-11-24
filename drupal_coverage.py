@@ -8,7 +8,6 @@
 #
 # TODO:
 #	* Count lines of code in subdirectories (right now we don't properly line-count the "field" module)
-# 	* Allow using an existing checkout (using the partially implemented -c argument)
 
 import os
 import argparse
@@ -25,7 +24,6 @@ testless_modules = []				# list of modules with no tests at all
 # Setup command line arguments
 parser = argparse.ArgumentParser(description="Test statistics for Drupal Core Modules. This script checks out all of the drupal"
 				+ "core modules and calculates each module's ratio of [lines of code] / [unit tests]")
-#parser.add_argument("-c", "--checkout-dir", dest="checkout", default="modules", help="the directory where we'll checkout drupal modules")
 parser.add_argument("-c", "--custom-module", dest="custom_module", default=None, help="the directory of a custom module to include in the stats count")
 args = parser.parse_args()
 
