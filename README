@@ -1,0 +1,4 @@
+Drupal Test Stats - Writen by Natan Yellin <aantny@gmail.com> (http://natanyellin.com)
+
+This script downloads popular drupal modules and calculates some stats.
+For usage instructions, try running ./drupal_coverage.py --help
