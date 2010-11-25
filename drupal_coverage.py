@@ -16,7 +16,8 @@ except ImportError:
 	sys.exit()
 
 # Define constants and global variables
-DOWNLOAD_DIR = "stats_checkout/"		# dir where we download core and contrib modules
+DOWNLOAD_DIR = "stats_checkout/"		# root dir where we download core and contrib modules
+CONTRIB_DIR = DOWNLOAD_DIR + "contrib/"		# dir for contrib modules
 CODE_EXTS = ["php", "inc", "module", "install"]	# file extensions to be included in the linecount
 OUTPUT_SEP = "-" * 100				# string used to separate between different sections of output
 best_ratio = 0					# the best ratio out of all the modules 
@@ -26,8 +27,7 @@ num_ratios = 0					# num of non-zero ratios
 testless_modules = []				# list of modules with no tests at all
 
 # lastly, include a list of the top 49 most popular drupal modules (in order of popularity)
-TOP_MODULES = ['views', 'cck', 'token', 'pathauto', 'filefield', 'admin_menu', 'imageapi', 'imagefield', 'imagecache', 'date', 'imce', 'google_analytics', 'wysiwyg', 'webform', 'advanced_help', 'poormanscron', 'captcha', 'image', 'jquery_ui', 'ctools', 'lightbox2', 'nodewords', 'link', 'backup_migrate', 'jquery_update', 'devel', 'xmlsitemap', 'fckeditor', 'panels', 'globalredirect', 'calendar', 'page_title', 'zen', 'imce_wysiwyg', 'transliteration', 'votingapi', 'ckeditor', 'views_slideshow', 'print', 'nice_menus', 'tagadelic', 'email', 'logintoboggan', 'contemplate', 'rules', 'site_map', 'path_redirect', 'emfield', 'i18n']
-
+TOP_MODULES = ['modules/views', 'modules/cck', 'modules/token', 'modules/pathauto', 'modules/filefield', 'modules/admin_menu', 'modules/imageapi', 'modules/imagefield', 'modules/imagecache', 'modules/date', 'modules/imce', 'modules/google_analytics', 'modules/wysiwyg', 'modules/webform', 'modules/advanced_help', 'modules/poormanscron', 'modules/captcha', 'modules/image', 'modules/jquery_ui', 'modules/ctools', 'modules/lightbox2', 'modules/nodewords', 'modules/link', 'modules/backup_migrate', 'modules/jquery_update', 'modules/devel', 'modules/xmlsitemap', 'modules/fckeditor', 'modules/panels', 'modules/globalredirect', 'modules/calendar', 'modules/page_title', 'themes/zen', 'modules/imce_wysiwyg', 'modules/transliteration', 'modules/votingapi', 'modules/ckeditor', 'modules/views_slideshow', 'modules/print', 'modules/nice_menus', 'modules/tagadelic', 'modules/email', 'modules/logintoboggan', 'modules/contemplate', 'modules/rules', 'modules/site_map', 'modules/path_redirect', 'modules/emfield', 'modules/i18n']
 
 # Setup command line arguments
 parser = argparse.ArgumentParser(description="Test statistics for Drupal Core Modules. This script checks out all of the drupal"
@@ -52,8 +52,8 @@ def download_core_modules ():
 def download_contrib_module (module):
 	"""Takes the name of a community module, downloads it, and returns the path"""
 	# Download the module to ./DOWNLOAD_DIR/contrib
-	dest = DOWNLOAD_DIR + "contrib/" + module + "/"
-	os.system("cvs -z6 -d:pserver:anonymous:anonymous@cvs.drupal.org:/cvs/drupal-contrib checkout -P -d %s contributions/modules/%s/" % (dest, module))
+	dest = CONTRIB_DIR + module + "/"
+	os.system("cvs -z6 -d:pserver:anonymous:anonymous@cvs.drupal.org:/cvs/drupal-contrib checkout -P -d %s contributions/%s/" % (dest, module))
 	
 	# Return the path of the downloaded module
 	return os.path.abspath(dest)
@@ -143,6 +143,13 @@ def print_overall_stats ():
 
 # Main program
 if __name__ == "__main__":
+	# Create the download dirs for contrib modules
+	try:
+		os.makedirs(CONTRIB_DIR + "modules")
+		os.makedirs(CONTRIB_DIR + "themes")
+	except OSError:	# if the directories already exist
+		pass
+
 	# Download all core and top modules and get their paths
 	core_modules = download_core_modules()
 	top_modules = download_top_modules()
