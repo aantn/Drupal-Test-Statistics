@@ -7,7 +7,13 @@
 # as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
 import os
-import argparse
+
+try:
+	import argparse
+except ImportError:
+	print "You're running an older version of Python that doesn't include the argparse module. You install it manually by running 'sudo easy_install argparse'"
+	import sys
+	sys.exit()
 
 # Define constants and global variables
 DOWNLOAD_DIR = "stats_checkout/"		# dir where we download core and contrib modules
