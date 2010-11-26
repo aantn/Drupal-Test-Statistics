@@ -7,12 +7,15 @@
 # as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
 import os
+import sys
+import urllib
+
+from xml.dom import minidom
 
 try:
 	import argparse
 except ImportError:
 	print "You're running an older version of Python that doesn't include the argparse module. You install it manually by running 'sudo easy_install argparse'"
-	import sys
 	sys.exit()
 
 # Define constants and global variables
@@ -37,6 +40,24 @@ parser.add_argument("-c", "--contrib-module", dest="contrib_module", default=Non
 args = parser.parse_args()
 
 # Functions
+def get_cvs_tag (module, drupal_version):
+	"""
+	Parses drupal.org's xml feeds to find a module's cvs tag for the latest release.
+	
+	module: the module's name (e.g. "views")
+	drupal_version: "7.x" or "6.x"
+	
+	returns the tag or None, if there is no release for the given drupal version
+	"""
+	# Parse the module's XML feed to find the main development tag
+	feed = urllib.urlopen("http://updates.drupal.org/release-history/%s/%s" % (module, drupal_version))
+	doc = minidom.parse(feed)
+	tags = doc.getElementsByTagName("tag")
+	if len(tags) == 0:
+		return None
+	tag = tags[0].toxml()[5:-6]	# there may be more than one tag - we take the most recent
+	return tag
+
 def download_core_modules ():
 	"""Downloads all core drupal modules from CVS and returns a list of paths to each module"""
 	# Download all core modules to ./DOWNLOAD_DIR/core/
@@ -51,9 +72,18 @@ def download_core_modules ():
 
 def download_contrib_module (module):
 	"""Takes the name of a community module, downloads it, and returns the path"""
+	# Get the module name (right now we have something like "modules/x" or "themes/x")
+	name = module.split("/")[-1]
+	
+	# Get the module's tag
+	tag = get_cvs_tag(name, "7.x")
+	if tag is None:
+		tag = get_cvs_tag(name, "6.x")
+
 	# Download the module to ./DOWNLOAD_DIR/contrib
 	dest = CONTRIB_DIR + module + "/"
-	os.system("cvs -z6 -d:pserver:anonymous:anonymous@cvs.drupal.org:/cvs/drupal-contrib checkout -P -d %s contributions/%s/" % (dest, module))
+	os.system("cvs -z6 -d:pserver:anonymous:anonymous@cvs.drupal.org:/cvs/drupal-contrib checkout -P " +
+		"-r %s -d %s contributions/%s/" % (tag, dest, module))
 	
 	# Return the path of the downloaded module
 	return os.path.abspath(dest)
